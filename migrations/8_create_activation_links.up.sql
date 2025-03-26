@@ -1,0 +1,10 @@
+CREATE TABLE activation_links (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    activation_id VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
