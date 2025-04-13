@@ -16,6 +16,7 @@ type Config struct {
 	JWTConfig        JWTConfig        `yaml:"jwt"`
 	HTTPServerConfig HTTPServerConfig `yaml:"http_server"`
 	EmailConfig      EmailConfig      `yaml:"email"`
+	BitrixConfig     BitrixConfig     `yaml:"bitrix"`
 }
 
 type StorageConfig struct {
@@ -56,6 +57,11 @@ type EmailInfo struct {
 	PortSSL  int    `yaml:"ssl_port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+type BitrixConfig struct {
+	OutgoingWebhookAuth string `yaml:"outgoing_webhook_auth"`
+	IncomingWebhook     string `yaml:"incoming_webhook"`
 }
 
 func MustLoad() *Config {

@@ -5,16 +5,39 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"ia-online-golang/internal/domain/models"
-	"ia-online-golang/internal/interfaces/errors/repositories"
+	"ia-online-golang/internal/models"
+
+	"github.com/lib/pq"
+)
+
+type UserRepositoryI interface {
+	UserByReferralCode(ctx context.Context, referral_code string) (models.User, error)
+	Users(ctx context.Context) ([]models.User, error)
+	UserByEmail(ctx context.Context, email string) (models.User, error)
+	UserById(ctx context.Context, id int64) (models.User, error)
+	UserIdByEmail(ctx context.Context, email string) (int64, error)
+	UserIdByPhone(ctx context.Context, phone string) (int64, error)
+	ValidationUser(ctx context.Context, email string, phone string, telegram string) error
+	UserIdByTelegram(ctx context.Context, telegram string) (int64, error)
+	CreateUser(ctx context.Context, user models.User) (models.User, error)
+	UpdateActiveUser(ctx context.Context, userID int64, isActive bool) error
+	UpdatePasswordUser(ctx context.Context, password_hash string, userID int64) error
+	UpdateUser(ctx context.Context, user models.User) error
+	DeleteUser(ctx context.Context, id int) error
+}
+
+var (
+	ErrUserExists       = errors.New("user already exists")
+	ErrUserNotFound     = errors.New("user not found")
+	ErrUserIsNotUpdated = errors.New("user is not updated")
 )
 
 // Получение пользователя по email
 func (s *Storage) UserByEmail(ctx context.Context, email string) (models.User, error) {
-	const op = "storage.user.GetUser"
+	const op = "storage.user.UserByEmail"
 	var user models.User
 
-	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, role, reward_internet, reward_cleaning, reward_shipping FROM users WHERE email = $1"
+	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, roles FROM users WHERE email = $1"
 	err := s.db.QueryRowContext(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
@@ -26,14 +49,11 @@ func (s *Storage) UserByEmail(ctx context.Context, email string) (models.User, e
 		&user.City,
 		&user.PasswordHash,
 		&user.ReferralCode,
-		&user.Role,
-		&user.RewardInternet,
-		&user.RewardCleaning,
-		&user.RewardShipping,
+		&user.Roles,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user, repositories.ErrUserNotFound
+			return user, ErrUserNotFound
 		}
 		return user, fmt.Errorf("%s: %w", op, err)
 	}
@@ -42,10 +62,10 @@ func (s *Storage) UserByEmail(ctx context.Context, email string) (models.User, e
 }
 
 func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
-	const op = "storage.user.GetUsers"
+	const op = "storage.user.Users"
 	var users []models.User
 
-	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, role, reward_internet, reward_cleaning, reward_shipping FROM users"
+	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, roles FROM users"
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -57,8 +77,7 @@ func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 		if err := rows.Scan(
 			&user.ID, &user.Email, &user.Name, &user.PhoneNumber, &user.Telegram,
 			&user.IsActive, &user.CreatedAt, &user.City, &user.PasswordHash,
-			&user.ReferralCode, &user.Role, &user.RewardInternet,
-			&user.RewardCleaning, &user.RewardShipping,
+			&user.ReferralCode, &user.Roles,
 		); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -73,10 +92,10 @@ func (s *Storage) Users(ctx context.Context) ([]models.User, error) {
 }
 
 func (s *Storage) UserByReferralCode(ctx context.Context, referral_code string) (models.User, error) {
-	const op = "storage.user.GetUser"
+	const op = "storage.user.UserByReferralCode"
 	var user models.User
 
-	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, role, reward_internet, reward_cleaning, reward_shipping FROM users WHERE referral_code = $1"
+	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, roles FROM users WHERE referral_code = $1"
 	err := s.db.QueryRowContext(ctx, query, referral_code).Scan(
 		&user.ID,
 		&user.Email,
@@ -88,14 +107,11 @@ func (s *Storage) UserByReferralCode(ctx context.Context, referral_code string) 
 		&user.City,
 		&user.PasswordHash,
 		&user.ReferralCode,
-		&user.Role,
-		&user.RewardInternet,
-		&user.RewardCleaning,
-		&user.RewardShipping,
+		&user.Roles,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user, repositories.ErrUserNotFound
+			return user, ErrUserNotFound
 		}
 		return user, fmt.Errorf("%s: %w", op, err)
 	}
@@ -104,10 +120,10 @@ func (s *Storage) UserByReferralCode(ctx context.Context, referral_code string) 
 }
 
 func (s *Storage) UserById(ctx context.Context, id int64) (models.User, error) {
-	const op = "storage.user.GetUser"
+	const op = "storage.user.UserById"
 	var user models.User
 
-	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, role, reward_internet, reward_cleaning, reward_shipping FROM users WHERE id = $1"
+	query := "SELECT id, email, name, phone_number, telegram, is_active, created_at, city, password_hash, referral_code, roles FROM users WHERE id = $1"
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&user.ID,
 		&user.Email,
@@ -119,14 +135,11 @@ func (s *Storage) UserById(ctx context.Context, id int64) (models.User, error) {
 		&user.City,
 		&user.PasswordHash,
 		&user.ReferralCode,
-		&user.Role,
-		&user.RewardInternet,
-		&user.RewardCleaning,
-		&user.RewardShipping,
+		&user.Roles,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user, repositories.ErrUserNotFound
+			return user, ErrUserNotFound
 		}
 		return user, fmt.Errorf("%s: %w", op, err)
 	}
@@ -134,16 +147,15 @@ func (s *Storage) UserById(ctx context.Context, id int64) (models.User, error) {
 	return user, nil
 }
 
-// Получение ID пользователя по email
 func (s *Storage) UserIdByEmail(ctx context.Context, email string) (int64, error) {
-	const op = "storage.user.GetUserIdOnEmail"
+	const op = "storage.user.UserIdByEmail"
 	var userId int64
 
 	query := "SELECT id FROM users WHERE email = $1"
 	err := s.db.QueryRowContext(ctx, query, email).Scan(&userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, repositories.ErrUserNotFound
+			return 0, ErrUserNotFound
 		}
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -151,16 +163,15 @@ func (s *Storage) UserIdByEmail(ctx context.Context, email string) (int64, error
 	return userId, nil
 }
 
-// Получение ID пользователя по email
 func (s *Storage) UserIdByPhone(ctx context.Context, phone string) (int64, error) {
-	const op = "storage.user.GetUserIdOnPhone"
+	const op = "storage.user.UserIdByPhone"
 	var userId int64
 
 	query := "SELECT id FROM users WHERE phone_number = $1"
 	err := s.db.QueryRowContext(ctx, query, phone).Scan(&userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, repositories.ErrUserNotFound
+			return 0, ErrUserNotFound
 		}
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -168,16 +179,15 @@ func (s *Storage) UserIdByPhone(ctx context.Context, phone string) (int64, error
 	return userId, nil
 }
 
-// Получение ID пользователя по telegram
 func (s *Storage) UserIdByTelegram(ctx context.Context, telegram string) (int64, error) {
-	const op = "storage.user.GetUserIdOnTelegram"
+	const op = "storage.user.UserIdByTelegram"
 	var userId int64
 
 	query := "SELECT id FROM users WHERE telegram = $1"
 	err := s.db.QueryRowContext(ctx, query, telegram).Scan(&userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, repositories.ErrUserNotFound
+			return 0, ErrUserNotFound
 		}
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -185,38 +195,40 @@ func (s *Storage) UserIdByTelegram(ctx context.Context, telegram string) (int64,
 	return userId, nil
 }
 
-func (s *Storage) ValidationUser(ctx context.Context, email string, phone string) error {
+func (s *Storage) ValidationUser(ctx context.Context, email string, phone string, telegram string) error {
 	const op = "storage.user.ValidationUser"
 
 	var count int
-	query := `SELECT COUNT(*) FROM users WHERE phone_number = $1 OR email = $2`
+	query := `SELECT COUNT(*) FROM users WHERE phone_number = $1 OR email = $2 OR telegram = $3`
 
-	err := s.db.QueryRowContext(ctx, query, phone, email).Scan(&count)
+	err := s.db.QueryRowContext(ctx, query, phone, email, telegram).Scan(&count)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	if count > 0 {
-		return repositories.ErrUserExists
+		return ErrUserExists
 	}
 
 	return nil
 }
 
-// CreateUser создаёт пользователя и возвращает его ID
-func (s *Storage) CreateUser(ctx context.Context, user models.User) (int64, error) {
+func (s *Storage) CreateUser(ctx context.Context, user models.User) (models.User, error) {
 	const op = "storage.user.CreateUser"
 
-	// Правильный SQL-запрос для PostgreSQL
-	query := "INSERT INTO users (email, password_hash, phone_number, name, telegram, city, referral_code, is_active, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
+	// Правильный SQL-запрос для PostgreSQL, который возвращает все поля пользователя
+	query := `INSERT INTO users (email, password_hash, phone_number, name, telegram, city, referral_code, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, roles, email, password_hash, phone_number, name, telegram, city, referral_code, is_active`
 
-	var userID int64
-	err := s.db.QueryRowContext(ctx, query, user.Email, user.PasswordHash, user.PhoneNumber, user.Name, user.Telegram, user.City, user.ReferralCode, user.IsActive, user.Role).Scan(&userID)
+	var newUser models.User
+	// Извлекаем все данные о пользователе
+	err := s.db.QueryRowContext(ctx, query, user.Email, user.PasswordHash, user.PhoneNumber, user.Name, user.Telegram, user.City, user.ReferralCode, user.IsActive).
+		Scan(&newUser.ID, &newUser.Roles, &newUser.Email, &newUser.PasswordHash, &newUser.PhoneNumber, &newUser.Name, &newUser.Telegram, &newUser.City, &newUser.ReferralCode, &newUser.IsActive)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return models.User{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return userID, nil
+	return newUser, nil
 }
 
 func (s *Storage) UpdateActiveUser(ctx context.Context, userID int64, isActive bool) error {
@@ -237,7 +249,7 @@ func (s *Storage) UpdateActiveUser(ctx context.Context, userID int64, isActive b
 
 	// Если обновлено 0 строк, значит пользователь не найден
 	if rowsAffected == 0 {
-		return repositories.ErrUserNotFound
+		return ErrUserNotFound
 	}
 
 	return nil
@@ -254,21 +266,20 @@ func (s *Storage) UpdateUser(ctx context.Context, user models.User) error {
 	if user.PasswordHash != "" {
 		updateFields["password"] = user.PasswordHash
 	}
+	if user.Name != "" {
+		updateFields["name"] = user.Name
+	}
+	if user.City != "" {
+		updateFields["city"] = user.City
+	}
 	if user.Telegram != "" {
 		updateFields["telegram"] = user.Telegram
 	}
 	if user.PhoneNumber != "" {
 		updateFields["phone_number"] = user.PhoneNumber
 	}
-
-	if user.RewardCleaning.Valid && user.RewardCleaning.Float64 > 0 {
-		updateFields["reward_cleaning"] = user.RewardCleaning.Float64
-	}
-	if user.RewardInternet.Valid && user.RewardInternet.Float64 > 0 {
-		updateFields["reward_internet"] = user.RewardInternet.Float64
-	}
-	if user.RewardShipping.Valid && user.RewardShipping.Float64 > 0 {
-		updateFields["reward_shipping"] = user.RewardShipping.Float64
+	if len(user.Roles) > 0 {
+		updateFields["roles"] = pq.Array(user.Roles)
 	}
 
 	// Строим динамический запрос
@@ -301,7 +312,31 @@ func (s *Storage) UpdateUser(ctx context.Context, user models.User) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("%s: %w", op, repositories.ErrUserIsNotUpdated)
+		return fmt.Errorf("%s: %w", op, ErrUserIsNotUpdated)
+	}
+
+	return nil
+}
+
+func (s *Storage) UpdatePasswordUser(ctx context.Context, password_hash string, userID int64) error {
+	const op = "storage.user.UpdatePasswordUser"
+
+	// Пытаемся обновить пользователя
+	query := "UPDATE users SET password_hash = $1 WHERE id = $2"
+	result, err := s.db.ExecContext(ctx, query, password_hash, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Проверяем, сколько строк было обновлено
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Если обновлено 0 строк, значит пользователь не найден
+	if rowsAffected == 0 {
+		return ErrUserNotFound
 	}
 
 	return nil

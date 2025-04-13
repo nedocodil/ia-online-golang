@@ -5,8 +5,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"ia-online-golang/internal/domain/models"
-	"ia-online-golang/internal/interfaces/errors/repositories"
+	"ia-online-golang/internal/models"
+)
+
+type ActivationLinkRepositoryI interface {
+	ActivationLinkByActivationId(ctx context.Context, activationID string) (models.ActivationLink, error)
+	ActivationLinkByUserId(ctx context.Context, userID int64) (models.ActivationLink, error)
+	SaveActivationLink(ctx context.Context, activation models.ActivationLink) error
+	DeleteActivationLink(ctx context.Context, activation models.ActivationLink) error
+	UpdateActivationLink(ctx context.Context, activation models.ActivationLink) error
+}
+
+var (
+	ErrActivationLinkIsNotFound   = errors.New("activation link is not found")
+	ErrActivationLinkIsNotUpdated = errors.New("activation link is not updated")
+	ErrGetActivationLink          = errors.New("error getting activation link")
+	ErrSaveActivationLink         = errors.New("error saving activation link")
 )
 
 func (s *Storage) ActivationLinkByActivationId(ctx context.Context, activationID string) (models.ActivationLink, error) {
@@ -22,7 +36,7 @@ func (s *Storage) ActivationLinkByActivationId(ctx context.Context, activationID
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.ActivationLink{}, repositories.ErrActivationLinkIsNotFound
+			return models.ActivationLink{}, ErrActivationLinkIsNotFound
 		}
 		return models.ActivationLink{}, fmt.Errorf("%s: %w", op, err)
 	}
@@ -43,7 +57,7 @@ func (s *Storage) ActivationLinkByUserId(ctx context.Context, userID int64) (mod
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.ActivationLink{}, repositories.ErrActivationLinkIsNotFound
+			return models.ActivationLink{}, ErrActivationLinkIsNotFound
 		}
 		return models.ActivationLink{}, fmt.Errorf("%s: %w", op, err)
 	}
@@ -65,7 +79,7 @@ func (s *Storage) SaveActivationLink(ctx context.Context, activation models.Acti
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
-		return repositories.ErrSaveActivationLink
+		return ErrSaveActivationLink
 	}
 
 	return nil
@@ -88,7 +102,7 @@ func (s *Storage) UpdateActivationLink(ctx context.Context, activation models.Ac
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
-		return repositories.ErrActivationLinkIsNotUpdated
+		return ErrActivationLinkIsNotUpdated
 	}
 
 	return nil
@@ -108,7 +122,7 @@ func (s *Storage) DeleteActivationLink(ctx context.Context, activation models.Ac
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
-		return repositories.ErrActivationLinkIsNotFound
+		return ErrActivationLinkIsNotFound
 	}
 
 	return nil

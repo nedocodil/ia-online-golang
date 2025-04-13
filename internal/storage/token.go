@@ -5,8 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"ia-online-golang/internal/domain/models"
-	"ia-online-golang/internal/interfaces/errors/repositories"
+	"ia-online-golang/internal/models"
+)
+
+type TokenRepositoryI interface {
+	RefreshTokenByUserId(ctx context.Context, userID int64) (models.Token, error)
+	RefreshTokenByToken(ctx context.Context, refresh_token string) (models.Token, error)
+	SaveRefreshToken(ctx context.Context, userID int64, token string) error
+	DeleteRefreshToken(ctx context.Context, refreshToken string) error
+	UpdateRefreshToken(ctx context.Context, userID int64, token string) error
+}
+
+var (
+	ErrTokenNotFound = errors.New("token not found")
 )
 
 func (s *Storage) RefreshTokenByToken(ctx context.Context, refresh_token string) (models.Token, error) {
@@ -22,7 +33,7 @@ func (s *Storage) RefreshTokenByToken(ctx context.Context, refresh_token string)
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.Token{}, repositories.ErrTokenNotFound
+			return models.Token{}, ErrTokenNotFound
 		}
 		return models.Token{}, fmt.Errorf("%s: %w", op, err)
 	}
@@ -43,7 +54,7 @@ func (s *Storage) RefreshTokenByUserId(ctx context.Context, userID int64) (model
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.Token{}, repositories.ErrTokenNotFound
+			return models.Token{}, ErrTokenNotFound
 		}
 		return models.Token{}, fmt.Errorf("%s: %w", op, err)
 	}
@@ -81,7 +92,7 @@ func (s *Storage) DeleteRefreshToken(ctx context.Context, refreshToken string) e
 	}
 
 	if rowsAffected == 0 {
-		return repositories.ErrTokenNotFound
+		return ErrTokenNotFound
 	}
 
 	return nil
@@ -103,7 +114,7 @@ func (s *Storage) UpdateRefreshToken(ctx context.Context, userID int64, token st
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
-		return repositories.ErrTokenNotFound
+		return ErrTokenNotFound
 	}
 
 	return nil

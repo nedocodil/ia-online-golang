@@ -16,6 +16,12 @@ type EmailService struct {
 	Password   string
 }
 
+type EmailServiceI interface {
+	SendEmail(ctx context.Context, toAddress, subject, body string) error
+	SendActivationLink(ctx context.Context, toAddress string, activationLink string) error
+	SendNewPassword(ctx context.Context, toAddress string, new_password string) error
+}
+
 // Конструктор для создания нового экземпляра EmailService
 func New(smtpServer, smtpPort, email, password string) *EmailService {
 	return &EmailService{
@@ -89,22 +95,154 @@ func (e *EmailService) SendActivationLink(ctx context.Context, toAddress string,
 	op := "EmailService.SendActivationLink"
 
 	htmlBody := `
-    <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Подтверждение регистрации</title>
-    </head>
-    <body>
-        <h2>Спасибо за регистрацию!</h2>
-        <p>Для подтверждения вашего аккаунта, пожалуйста, перейдите по следующей <a href="{{.ActivationLink}}">ссылке</a>.</p>
-    </body>
-    </html>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение регистрации</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            padding: 0;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #7ed956;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+        }
+        .content {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            padding: 30px;
+        }
+        .button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background-color: #7ed956;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Добро пожаловать!</div>
+        <div class="content">
+            <h2>Спасибо за регистрацию 🎉</h2>
+            <p>Чтобы активировать ваш аккаунт, нажмите на кнопку ниже:</p>
+            <a class="button" href="{{.ActivationLink}}">Подтвердить аккаунт</a>
+            <p class="footer">Если вы не регистрировались, просто проигнорируйте это письмо.</p>
+        </div>
+    </div>
+</body>
+</html>
 `
 	htmlBody = strings.Replace(htmlBody, "{{.ActivationLink}}", activationLink, -1)
 
 	err := e.SendEmail(ctx, toAddress, "Подтверждение регестрации", htmlBody)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (e *EmailService) SendNewPassword(ctx context.Context, toAddress string, new_password string) error {
+	op := "EmailService.SendPasswordCode"
+
+	htmlBody := `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новый пароль</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            padding: 0;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #7ed956;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+        }
+        .content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+        }
+        .password-box {
+            margin-top: 20px;
+            background-color: #f0f0f0;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 6px;
+            word-break: break-all;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Временный пароль</div>
+        <div class="content">
+            <h2>Ваш новый временный пароль:</h2>
+            <div class="password-box">{{.NewPassword}}</div>
+            <p class="footer">Рекомендуем сменить его сразу после входа.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+	htmlBody = strings.Replace(htmlBody, "{{.NewPassword}}", new_password, -1)
+
+	err := e.SendEmail(ctx, toAddress, "Новый временный пароль", htmlBody)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

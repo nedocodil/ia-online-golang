@@ -21,6 +21,9 @@ func SendError(w http.ResponseWriter, statusCode int, message string) {
 	})
 }
 
+func Ok(w http.ResponseWriter) {
+	SendError(w, http.StatusOK, "ok")
+}
 func MethodNotAllowed(w http.ResponseWriter) {
 	SendError(w, http.StatusMethodNotAllowed, "method not allowed")
 }
@@ -33,8 +36,8 @@ func UserAlreadyExists(w http.ResponseWriter) {
 func UserNotFound(w http.ResponseWriter) {
 	SendError(w, http.StatusNotFound, "user not found")
 }
-func ReferralNotUsed(w http.ResponseWriter) {
-	SendError(w, http.StatusConflict, "referral not used")
+func ReferralNotFound(w http.ResponseWriter) {
+	SendError(w, http.StatusConflict, "referral not found")
 }
 func ServerError(w http.ResponseWriter) {
 	SendError(w, http.StatusInternalServerError, "error server")
@@ -71,4 +74,16 @@ func ExpiredAccessToken(w http.ResponseWriter) {
 }
 func InvalidBearerFormat(w http.ResponseWriter) {
 	SendError(w, http.StatusUnauthorized, "invalid bearer format")
+}
+func Forbidden(w http.ResponseWriter) {
+	SendError(w, http.StatusForbidden, "not enough rights")
+}
+func OldPasswordIncorrect(w http.ResponseWriter) {
+	SendError(w, http.StatusConflict, "old password is incorrect")
+}
+func PasswordCodeHasExpired(w http.ResponseWriter) {
+	SendError(w, http.StatusGone, "password code has expired")
+}
+func PasswordCodeIncorrect(w http.ResponseWriter) {
+	SendError(w, http.StatusUnauthorized, "password code incorrect")
 }
